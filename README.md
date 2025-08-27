@@ -33,13 +33,14 @@ We use [SemVer](http://semver.org/) for versioning. For the versions available, 
 
 ## Authors
 
-* **Brad Chiappetta** - *Initial work* - [bradchiappetta](https://github.com/bradchiappetta)
+* **Brad Chiappetta** - *Initial Work* - [bradchiappetta](https://github.com/bradchiappetta)
+
 
 See also the list of [contributors](https://github.com/GreyNoise-Intelligence/greynoise-cribl-mmdb/contributors) who participated in this project.
 
 ## Acknowledgments
 
-* Person (https://github.com/github-handle) - reason
+* **StacySimmons** - *Core Code for Cribl.Cloud Lookup* - [cribl-ldap-lookup](https://github.com/StacySimmons/cribl-ldap-lookup)
 
 
 ## Links
