@@ -19,7 +19,6 @@ jobs:
         with:
           checkName: "Python Lint"
           path: .
-          max-line-length: 120
 
   black:
     name: Python Lint - black

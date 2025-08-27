@@ -1,4 +1,4 @@
-[![python-linters](https://github.com/GreyNoise-Intelligence/greynoise-cribl-mmdb/workflows/Build/badge.svg)](https://github.com/GreyNoise-Intelligence/greynoise-cribl-mmdb/actions?query=workflow%3Apython-linters)
+[![python-linters](https://github.com/GreyNoise-Intelligence/greynoise-cribl-mmdb/workflows/python_linters/badge.svg)](https://github.com/GreyNoise-Intelligence/greynoise-cribl-mmdb/actions?query=workflow%3Apython_linters)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 # GreyNoise Cribl MMDB Upload Script
