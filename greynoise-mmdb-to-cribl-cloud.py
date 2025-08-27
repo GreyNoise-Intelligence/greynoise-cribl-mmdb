@@ -170,7 +170,7 @@ def get_bearer_token(client_id, client_secret):
 
 
 def check_lookup_exists(token, organization_id, worker_group, lookup_filename):
-    url = f"https://app.cribl.cloud/organizations/{organization_id}/workspaces/main/app/api/v1/m/{worker_group}/system/lookups/{lookup_filename}"
+    url = f"https://app.cribl.cloud/organizations/{organization_id}/workspaces/main/app/api/v1/m/{worker_group}/system/lookups/{lookup_filename}"  # noqa: E501
     headers = {"accept": "application/json", "Authorization": f"Bearer {token}"}
 
     try:
@@ -188,7 +188,7 @@ def check_lookup_exists(token, organization_id, worker_group, lookup_filename):
 
 
 def upload_lookup_file(token, organization_id, worker_group, lookup_filename):
-    url = f"https://app.cribl.cloud/organizations/{organization_id}/workspaces/main/app/api/v1/m/{worker_group}/system/lookups?filename={lookup_filename}"
+    url = f"https://app.cribl.cloud/organizations/{organization_id}/workspaces/main/app/api/v1/m/{worker_group}/system/lookups?filename={lookup_filename}"  # noqa: E501
     content_type = "text/csv" if lookup_filename.endswith(".csv") else "application/gzip"
 
     headers = {"Authorization": f"Bearer {token}", "Content-type": content_type, "accept": "application/json"}
@@ -220,7 +220,7 @@ def upload_lookup_file(token, organization_id, worker_group, lookup_filename):
 
 
 def create_lookup(token, organization_id, worker_group, lookup_filename, temp_filename):
-    url = f"https://app.cribl.cloud/organizations/{organization_id}/workspaces/main/app/api/v1/m/{worker_group}/system/lookups"
+    url = f"https://app.cribl.cloud/organizations/{organization_id}/workspaces/main/app/api/v1/m/{worker_group}/system/lookups"  # noqa: E501
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
     payload = {"id": lookup_filename, "fileInfo": {"filename": temp_filename}}
 
@@ -235,7 +235,7 @@ def create_lookup(token, organization_id, worker_group, lookup_filename, temp_fi
 
 
 def update_lookup(token, organization_id, worker_group, lookup_filename, temp_filename):
-    url = f"https://app.cribl.cloud/organizations/{organization_id}/workspaces/main/app/api/v1/m/{worker_group}/system/lookups/{lookup_filename}"
+    url = f"https://app.cribl.cloud/organizations/{organization_id}/workspaces/main/app/api/v1/m/{worker_group}/system/lookups/{lookup_filename}"  # noqa: E501
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json", "accept": "application/json"}
     payload = {"id": lookup_filename, "fileInfo": {"filename": temp_filename}}
 
@@ -250,7 +250,7 @@ def update_lookup(token, organization_id, worker_group, lookup_filename, temp_fi
 
 
 def commit_changes(token, organization_id, worker_group, lookup_filename):
-    url = f"https://app.cribl.cloud/organizations/{organization_id}/workspaces/main/app/api/v1/m/{worker_group}/version/commit"
+    url = f"https://app.cribl.cloud/organizations/{organization_id}/workspaces/main/app/api/v1/m/{worker_group}/version/commit"  # noqa: E501
     headers = {
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json",
@@ -281,7 +281,7 @@ def commit_changes(token, organization_id, worker_group, lookup_filename):
 
 
 def deploy_changes(token, organization_id, worker_group, commit_id):
-    url = f"https://app.cribl.cloud/organizations/{organization_id}/workspaces/main/app/api/v1/master/groups/{worker_group}/deploy"
+    url = f"https://app.cribl.cloud/organizations/{organization_id}/workspaces/main/app/api/v1/master/groups/{worker_group}/deploy"  # noqa: E501
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json", "accept": "application/json"}
     payload = {"version": commit_id}
 
