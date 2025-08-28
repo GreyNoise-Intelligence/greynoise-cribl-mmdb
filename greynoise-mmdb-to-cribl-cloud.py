@@ -1,12 +1,14 @@
+import csv
 import gzip
+import ipaddress
 import logging
 import os
 from datetime import datetime, timedelta
-from dotenv import load_dotenv
 from pathlib import Path
 
 import maxminddb
 import requests
+from dotenv import load_dotenv
 
 load_dotenv()
 
@@ -294,6 +296,154 @@ def deploy_changes(token, organization_id, worker_group, commit_id):
         return False
 
 
+def cleanup_old_files(temp_dir, lookup_filename, csv_filename=None):
+    """Remove MMDB file after processing.
+
+    Args:
+        temp_dir: Directory to search for files
+        lookup_filename: Name of the lookup file to remove
+    """
+    try:
+        # Find all matching files
+        if temp_dir and lookup_filename:
+            logger.info(f"Removing old MMDB file: {lookup_filename}")
+            os.remove(os.path.join(temp_dir, lookup_filename))
+            if csv_filename:
+                logger.info(f"Removing old CSV file: {csv_filename}")
+                os.remove(os.path.join(temp_dir, csv_filename))
+            return True
+        else:
+            logger.error("No temp directory or lookup filename provided")
+            return False
+    except Exception as e:
+        logger.error(f"Error cleaning up old files: {e}")
+        return False
+
+
+def convert_mmdb_to_csv(temp_dir, lookup_filename, max_rows=None):
+    """Convert MMDB file to CSV format for human readability.
+
+    Args:
+        mmdb_path: Path to the MMDB file
+        csv_path: Path where CSV file will be created
+        max_rows: Maximum number of rows to export (None for all)
+    """
+    try:
+        mmdb_path = os.path.join(temp_dir, lookup_filename)
+        base_filename = os.path.splitext(lookup_filename)[0]
+        csv_filename = f"{base_filename}-SAMPLE.csv"
+        csv_path = os.path.join(temp_dir, csv_filename)
+        logger.info(f"Converting MMDB to CSV: {lookup_filename} -> {csv_filename}")
+
+        with maxminddb.open_database(mmdb_path) as reader:
+            # Determine CSV headers by examining first few entries
+            headers_found = set()
+            sample_entries = []
+
+            # Collect sample entries to determine all possible fields
+            logger.info("Analyzing MMDB structure to determine CSV headers...")
+            entry_count = 0
+            for network, data in reader:
+                if data:  # Only process entries with data
+                    sample_entries.append((str(network), data))
+                    # Collect all keys from the data
+                    if isinstance(data, dict):
+                        headers_found.update(data.keys())
+                    entry_count += 1
+                    if entry_count >= 1000:  # Sample first 1000 entries for header detection
+                        break
+
+            # Create standardized headers
+            base_headers = ["network", "network_start", "network_end"]
+            data_headers = sorted(list(headers_found))
+            csv_headers = base_headers + data_headers
+
+            logger.info(f"Starting CSV export (max_rows: {max_rows if max_rows else 'unlimited'})...")
+
+            # Write CSV file
+            with open(csv_path, "w", newline="", encoding="utf-8") as csvfile:
+                writer = csv.DictWriter(csvfile, fieldnames=csv_headers)
+                writer.writeheader()
+
+                rows_written = 0
+
+                # Reset reader and process all entries
+                for network, data in reader:
+                    if max_rows and rows_written >= max_rows:
+                        logger.info(f"Reached maximum row limit of {max_rows}")
+                        break
+
+                    if data:  # Only process entries with data
+                        # Convert network to IP range
+                        network_obj = ipaddress.ip_network(network)
+
+                        # Create CSV row
+                        csv_row = {
+                            "network": str(network),
+                            "network_start": str(network_obj.network_address),
+                            "network_end": str(network_obj.broadcast_address),
+                        }
+
+                        # Add data fields with clean type indicators for complex structures
+                        if isinstance(data, dict):
+                            for key in data_headers:
+                                value = data.get(key, "")
+                                # Handle different data types appropriately
+                                if isinstance(value, list):
+                                    if len(value) == 0:
+                                        csv_row[key] = "EMPTY_LIST"
+                                    elif len(value) == 1:
+                                        # Show single item value, cleaned for CSV safety
+                                        item_str = (
+                                            str(value[0]).replace(",", ";").replace('"', "'").replace("\n", " ")[:50]
+                                        )
+                                        csv_row[key] = f"LIST_1_ITEM_{item_str}"
+                                    else:
+                                        csv_row[key] = f"LIST_{len(value)}_ITEMS"
+                                elif isinstance(value, dict):
+                                    if len(value) == 0:
+                                        csv_row[key] = "EMPTY_DICT"
+                                    else:
+                                        # Show key names for dict structure insight
+                                        keys_preview = "_".join(
+                                            str(k).replace(",", ";")[:10] for k in list(value.keys())[:3]
+                                        )
+                                        csv_row[key] = f"DICT_{len(value)}_KEYS_{keys_preview}"
+                                elif value is None or value == "":
+                                    csv_row[key] = "NULL"
+                                elif isinstance(value, bool):
+                                    csv_row[key] = "true" if value else "false"
+                                else:
+                                    # Simple types - clean for CSV safety
+                                    clean_value = (
+                                        str(value)
+                                        .replace(",", ";")
+                                        .replace('"', "'")
+                                        .replace("\n", " ")
+                                        .replace("\r", "")
+                                    )
+                                    csv_row[key] = clean_value[:200]  # Reasonable field length limit
+
+                        writer.writerow(csv_row)
+                        rows_written += 1
+
+                        # Progress update
+                        if rows_written % 50000 == 0:
+                            logger.info(f"Exported {rows_written:,} rows to CSV...")
+
+                logger.info(f"CSV export completed: {rows_written:,} rows written to {csv_path}")
+
+                # Check file size
+                csv_size = os.path.getsize(csv_path)
+                logger.info(f"CSV file size: {csv_size:,} bytes ({csv_size/1024/1024:.1f} MB)")
+
+                return csv_path, csv_filename
+
+    except Exception as e:
+        logger.error(f"Error converting MMDB to CSV: {str(e)}")
+        raise Exception(f"Failed to convert MMDB to CSV: {str(e)}")
+
+
 def main():
     try:
         logger.info("Starting capture of GreyNoise MMDB file and upload to Cribl Cloud.")
@@ -306,6 +456,10 @@ def main():
         organization_id = os.getenv("CRIBL_ORGANIZATION_ID")
         worker_group = os.getenv("CRIBL_WORKER_GROUP")
         lookup_filename = "ti_greynoise_indicators-simple.mmdb"
+        create_csv = bool(os.getenv("CREATE_CSV", "false").lower() in ("true", "1", "yes"))
+        csv_max_rows = int(os.getenv("CSV_MAX_ROWS", "100"))
+        lookup_filename = None
+        csv_filename = None
 
         logger.info("Getting Cribl token")
         token = get_bearer_token(client_id, client_secret)
@@ -343,6 +497,41 @@ def main():
         if not deploy_changes(token, organization_id, worker_group, commit_id):
             raise Exception("Failed to deploy changes")
         logger.info(f"Successfully deployed changes to {worker_group}")
+
+        if create_csv:
+            logger.info("Converting MMDB to CSV...")
+            csv_path, csv_filename = convert_mmdb_to_csv(temp_dir, lookup_filename, csv_max_rows)
+            logger.info("CSV conversion completed.")
+
+            csv_temp_filename = upload_lookup_file(token, organization_id, worker_group, csv_filename)
+            if not csv_temp_filename:
+                raise Exception("Failed to upload CSV file")
+            logger.info(f"Uploaded '{csv_filename}' to {worker_group}, temporary filename: '{csv_temp_filename}'")
+
+            if check_lookup_exists(token, organization_id, worker_group, csv_filename):
+                logger.info("Does exist on target.")
+                if not update_lookup(token, organization_id, worker_group, csv_filename, csv_temp_filename):
+                    raise Exception("Failed to update CSV sample file")
+            else:
+                logger.info("Does not exist on target.")
+                if not create_lookup(token, organization_id, worker_group, csv_filename, csv_temp_filename):
+                    raise Exception("Failed to create CSV sample file")
+
+            # Commit the changes
+            commit_id = commit_changes(token, organization_id, worker_group, csv_filename)
+            if not commit_id:
+                raise Exception("Failed to commit changes")
+            logger.info(f"Changes committed with ID: {commit_id}")
+
+            # Deploy the changes
+            if not deploy_changes(token, organization_id, worker_group, commit_id):
+                raise Exception("Failed to deploy changes")
+            logger.info(f"Successfully deployed changes to {worker_group}")
+
+        # Cleanup old files
+        if not cleanup_old_files(temp_dir, lookup_filename, csv_filename):
+            raise Exception("Failed to cleanup old files")
+        logger.info(f"Successfully cleaned up old files in {temp_dir}")
 
     except Exception as e:
         logger.error(f"Error in main function: {e}")
